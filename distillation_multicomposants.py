@@ -9,24 +9,22 @@ Université uh1
 """
 
 import numpy as np
-import matplotlib.pyplot as plt
 from scipy.optimize import fsolve, brentq, minimize
 from scipy.linalg import solve_banded
 from thermo.chemical import Chemical
 from thermo import ChemicalConstantsPackage, PRMIX, CEOSLiquid, CEOSGas
 import warnings
+import sys
+import os
+import io
 warnings.filterwarnings('ignore')
 
-# Pour visualisations interactives
-try:
-    import plotly.graph_objects as go
-    from plotly.subplots import make_subplots
-    import plotly.express as px
-    PLOTLY_AVAILABLE = True
-except ImportError:
-    PLOTLY_AVAILABLE = False
-    print("⚠ Plotly non disponible. Installation: pip install plotly")
-    print("  Les visualisations interactives ne seront pas disponibles.")
+class SuppressOutput:
+    def write(self, x): pass
+    def flush(self): pass
+
+sys.stdout = SuppressOutput()
+sys.stderr = SuppressOutput()
 
 class Compound:
     """

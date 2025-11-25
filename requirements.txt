@@ -1,71 +1,50 @@
 # =============================================================================
-# REQUIREMENTS.TXT - Distillation Multicomposants
+# REQUIREMENTS.TXT - Distillation Multicomposants DASH APP
 # =============================================================================
 # Cours: Modélisation et Simulation des Procédés - PIC
 # Prof. BAKHER Zine Elabidine - Uh1
 # =============================================================================
 
 # ===========================
-# BIBLIOTHÈQUES ESSENTIELLES
+# CORE SCIENTIFIC LIBRARIES
 # ===========================
-
-# Calcul scientifique
-numpy>=1.20.0
-scipy>=1.7.0
-pandas>=1.3.0
-
-# Visualisation
-matplotlib>=3.4.0
-seaborn>=0.11.0
+numpy
+scipy
+pandas
 
 # ======================================
-# BIBLIOTHÈQUES THERMODYNAMIQUES
+# THERMODYNAMIC LIBRARIES
 # ======================================
-
-# Principale bibliothèque pour propriétés thermodynamiques
-thermo>=0.2.20
-
-# Base de données de propriétés physiques
-chemicals>=1.1.4
-
-# Bibliothèque haute précision pour fluides
-CoolProp>=6.4.1
+thermo
+chemicals
+CoolProp
 
 # ======================================
-# VISUALISATION INTERACTIVE (PLOTLY)
+# DASH WEB APPLICATION FRAMEWORK
 # ======================================
-
-# Graphiques interactifs style D3.js
-plotly>=5.14.0
-
-# Export images statiques depuis Plotly
-kaleido>=0.2.1
-
-# Alternative pour export (optionnel)
-# python-kaleido>=0.2.1
+dash
+dash-bootstrap-components
 
 # ======================================
-# UTILITAIRES
+# VISUALIZATION (PLOTLY)
 # ======================================
+plotly
+kaleido
 
-# Pour gestion de tableaux et données
-openpyxl>=3.0.0
-
-# Pour export PDF (optionnel)
-# reportlab>=3.6.0
+# ======================================
+# UTILITIES
+# ======================================
+openpyxl
 
 # ======================================
 # NOTES D'INSTALLATION
 # ======================================
-
 # Pour installer toutes les dépendances:
 # pip install -r requirements.txt
 
-# Pour installer sans les optionnelles:
-# pip install numpy scipy pandas matplotlib thermo chemicals CoolProp plotly
+# Pour lancer l'application Dash:
+# python app.py
+# Puis ouvrir: http://127.0.0.1:8050
 
-# Si problème avec kaleido, installer manuellement:
-# pip install kaleido --no-cache-dir
-
-# Pour environnement Jupyter (optionnel):
-# pip install jupyter notebook ipywidgets
+# Si problème avec kaleido:
+# pip install kaleido --no-cache-dir --upgrade
