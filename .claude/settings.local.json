@@ -1,7 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "Bash(python -m py_compile:*)"
+      "Bash(python -m py_compile:*)",
+      "Bash(python -c \"from distillation import Compound, ThermodynamicPackage, ShortcutDistillation; print(''✓ Backend imports successful'')\")",
+      "Bash(python -c:*)",
+      "Bash(.venv/Scripts/python:*)",
+      "Bash(tree:*)"
     ],
     "deny": [],
     "ask": []

@@ -1,3 +1,32 @@
+# IDE
 .claude
+.vscode/
+.idea/
+
+# Python
 .venv
-__pycache__
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Output files
+*.png
+*.html
+
+# Documentation build
+docs/_build/
+docs/_static/
+docs/_templates/
+
+.claude
+...pdf

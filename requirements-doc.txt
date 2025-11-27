@@ -1,0 +1,15 @@
+# Documentation Requirements
+# =========================
+# For building Sphinx documentation
+
+# Core Sphinx
+sphinx>=7.0.0
+sphinx-rtd-theme>=2.0.0          # Read the Docs theme
+
+# Sphinx Extensions
+sphinx-autodoc-typehints>=1.25.0  # Type hints in docs
+sphinx-copybutton>=0.5.2          # Copy button for code blocks
+myst-parser>=2.0.0                # Markdown support
+
+# For rendering
+docutils>=0.20.0
