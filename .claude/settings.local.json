@@ -5,7 +5,8 @@
       "Bash(python -c \"from distillation import Compound, ThermodynamicPackage, ShortcutDistillation; print(''✓ Backend imports successful'')\")",
       "Bash(python -c:*)",
       "Bash(.venv/Scripts/python:*)",
-      "Bash(tree:*)"
+      "Bash(tree:*)",
+      "Bash(git push:*)"
     ],
     "deny": [],
     "ask": []

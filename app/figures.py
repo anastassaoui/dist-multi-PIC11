@@ -298,3 +298,164 @@ def create_summary_table(results, compound_names):
     )
 
     return table
+
+
+def create_flow_rates_figure(stages, L_flows, V_flows, feed_stage):
+    """Create internal flow rates plot"""
+    fig = go.Figure()
+
+    fig.add_trace(
+        go.Scatter(
+            x=L_flows,
+            y=stages,
+            mode='lines+markers',
+            name='Liquid Flow (L)',
+            line=dict(color='#1976d2', width=2),
+            marker=dict(size=4, color='#1976d2'),
+            hovertemplate='<b>Liquid Flow</b><br>' +
+                         'Stage: %{y}<br>' +
+                         'L: %{x:.1f} kmol/h<extra></extra>'
+        )
+    )
+
+    fig.add_trace(
+        go.Scatter(
+            x=V_flows,
+            y=stages,
+            mode='lines+markers',
+            name='Vapor Flow (V)',
+            line=dict(color='#d32f2f', width=2),
+            marker=dict(size=4, color='#d32f2f'),
+            hovertemplate='<b>Vapor Flow</b><br>' +
+                         'Stage: %{y}<br>' +
+                         'V: %{x:.1f} kmol/h<extra></extra>'
+        )
+    )
+
+    fig.add_hline(
+        y=feed_stage,
+        line_dash="dash",
+        line_color='#999999',
+        line_width=2,
+        annotation_text=f"Feed Stage",
+        annotation_position="left"
+    )
+
+    fig.update_layout(
+        title='Internal Flow Rates Profile',
+        title_font=dict(size=14, color='#000000', family='Arial Black'),
+        xaxis_title='Flow Rate (kmol/h)',
+        yaxis_title='Stage Number',
+        plot_bgcolor='white',
+        paper_bgcolor='white',
+        font=dict(size=11, color='#000000'),
+        height=500,
+        hovermode='closest',
+        showlegend=True,
+        legend=dict(x=0.7, y=0.98, bgcolor='rgba(255,255,255,0.8)'),
+        xaxis=dict(gridcolor='#e0e0e0', showgrid=True),
+        yaxis=dict(gridcolor='#e0e0e0', showgrid=True, autorange='reversed')
+    )
+
+    return fig
+
+
+def create_vapor_composition_figure(stages, y_profiles, feed_stage, compound_names):
+    """Create vapor composition profiles chart"""
+    fig = go.Figure()
+
+    n_comp = len(compound_names)
+
+    # Dynamic colors based on number of components
+    if n_comp == 2:
+        colors = ['#000000', '#666666']
+    elif n_comp == 3:
+        colors = ['#000000', '#333333', '#666666']
+    elif n_comp == 4:
+        colors = ['#000000', '#2d2d2d', '#4d4d4d', '#737373']
+    else:
+        colors = [f'#{hex(int(255 - i * (255/(n_comp-1))))[2:].zfill(2)}' * 3 for i in range(n_comp)]
+
+    for i, compound in enumerate(compound_names):
+        fig.add_trace(
+            go.Scatter(
+                x=y_profiles[:, i],
+                y=stages,
+                mode='lines+markers',
+                name=compound.capitalize(),
+                line=dict(color=colors[i], width=2, dash='dash'),
+                marker=dict(size=4, color=colors[i], symbol='square'),
+                hovertemplate=f'<b>{compound.capitalize()} (Vapor)</b><br>' +
+                             'Stage: %{y}<br>' +
+                             'Mole Fraction: %{x:.4f}<extra></extra>'
+            )
+        )
+
+    fig.add_hline(
+        y=feed_stage,
+        line_dash="dash",
+        line_color='#999999',
+        line_width=2,
+        annotation_text=f"Feed Stage",
+        annotation_position="left"
+    )
+
+    fig.update_layout(
+        title='Vapor Composition Profiles',
+        title_font=dict(size=14, color='#000000', family='Arial Black'),
+        xaxis_title='Vapor Mole Fraction',
+        yaxis_title='Stage Number',
+        plot_bgcolor='white',
+        paper_bgcolor='white',
+        font=dict(size=11, color='#000000'),
+        height=500,
+        hovermode='closest',
+        showlegend=True,
+        legend=dict(x=0.02, y=0.98, bgcolor='rgba(255,255,255,0.8)'),
+        xaxis=dict(gridcolor='#e0e0e0', showgrid=True, range=[0, 1]),
+        yaxis=dict(gridcolor='#e0e0e0', showgrid=True, autorange='reversed')
+    )
+
+    return fig
+
+
+def create_heat_duties_card(QC, QR):
+    """Create heat duties display card"""
+    import dash_bootstrap_components as dbc
+    from dash import html
+
+    card = dbc.Card([
+        dbc.CardBody([
+            html.H5("Heat Duties", className="card-title",
+                   style={'fontWeight': '700', 'letterSpacing': '1px',
+                         'color': '#000000', 'marginBottom': '1.5rem'}),
+            dbc.Row([
+                dbc.Col([
+                    html.Div([
+                        html.H6("Condenser Duty (QC)", style={'fontSize': '0.8rem',
+                                                               'color': '#666666',
+                                                               'textTransform': 'uppercase',
+                                                               'fontWeight': '600'}),
+                        html.H3(f"{abs(QC):.1f} kW", style={'color': '#1976d2',
+                                                            'fontWeight': '800',
+                                                            'margin': '0.5rem 0'}),
+                        html.Small("Heat Removed", style={'color': '#666666'})
+                    ])
+                ], md=6),
+                dbc.Col([
+                    html.Div([
+                        html.H6("Reboiler Duty (QR)", style={'fontSize': '0.8rem',
+                                                              'color': '#666666',
+                                                              'textTransform': 'uppercase',
+                                                              'fontWeight': '600'}),
+                        html.H3(f"{abs(QR):.1f} kW", style={'color': '#d32f2f',
+                                                            'fontWeight': '800',
+                                                            'margin': '0.5rem 0'}),
+                        html.Small("Heat Added", style={'color': '#666666'})
+                    ])
+                ], md=6)
+            ])
+        ])
+    ], style={'border': '1px solid #cccccc', 'marginBottom': '2rem'})
+
+    return card

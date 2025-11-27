@@ -11,5 +11,6 @@ Université uh1
 from .models import Compound
 from .thermodynamics import ThermodynamicPackage
 from .shortcut import ShortcutDistillation
+from .mesh import MESHSolver
 
-__all__ = ['Compound', 'ThermodynamicPackage', 'ShortcutDistillation']
+__all__ = ['Compound', 'ThermodynamicPackage', 'ShortcutDistillation', 'MESHSolver']

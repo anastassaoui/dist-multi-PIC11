@@ -278,6 +278,44 @@ def design_page():
                         'marginBottom': '2rem'
                     }),
 
+                    # SIMULATION METHOD
+                    html.Div([
+                        html.H6("SIMULATION METHOD",
+                               style={
+                                   'fontWeight': '700',
+                                   'letterSpacing': '1px',
+                                   'marginBottom': '1.5rem',
+                                   'fontSize': '0.9rem',
+                                   'color': COLORS['primary']
+                               }),
+                        dbc.Row([
+                            dbc.Col([
+                                html.Label("Method",
+                                          style={'fontWeight': '600', 'fontSize': '0.75rem',
+                                                'textTransform': 'uppercase', 'letterSpacing': '0.5px',
+                                                'color': COLORS['text_secondary'], 'marginBottom': '0.5rem',
+                                                'display': 'block'}),
+                                dcc.Dropdown(
+                                    id='simulation-method',
+                                    options=[
+                                        {'label': 'Shortcut Methods (Fenske-Underwood-Gilliland)', 'value': 'shortcut'},
+                                        {'label': 'Rigorous Simulation (MESH Equations)', 'value': 'rigorous'}
+                                    ],
+                                    value='shortcut',
+                                    clearable=False,
+                                    style={'marginBottom': '1rem'}
+                                ),
+                                html.Small("Rigorous simulation provides accurate stage-by-stage profiles but takes longer",
+                                          style={'color': COLORS['text_secondary'], 'fontSize': '0.7rem'})
+                            ], md=12)
+                        ])
+                    ], style={
+                        'backgroundColor': COLORS['card_bg'],
+                        'padding': '2rem',
+                        'border': f'1px solid {COLORS["input_border"]}',
+                        'marginBottom': '2rem'
+                    }),
+
                     # CALCULATE BUTTON
                     html.Div([
                         dbc.Button("CALCULATE DESIGN",

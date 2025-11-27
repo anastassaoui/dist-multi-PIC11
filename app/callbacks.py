@@ -5,14 +5,17 @@ Dash callbacks for application logic - DYNAMIC VERSION
 import numpy as np
 import dash_bootstrap_components as dbc
 from dash import Input, Output, State, callback, no_update, html, dcc, ALL, MATCH
-from distillation import Compound, ThermodynamicPackage, ShortcutDistillation
+from distillation import Compound, ThermodynamicPackage, ShortcutDistillation, MESHSolver
 from .layout import design_page, COMMON_COMPOUNDS
 from .figures import (
     create_material_balance_figure,
     create_composition_figure,
     create_temperature_figure,
     create_gilliland_figure,
-    create_summary_table
+    create_summary_table,
+    create_flow_rates_figure,
+    create_vapor_composition_figure,
+    create_heat_duties_card
 )
 from . import COLORS
 
@@ -135,11 +138,12 @@ def update_compound_and_composition_inputs(n_components):
      State('efficiency', 'value'),
      State('n-components', 'value'),
      State({'type': 'compound-select', 'index': ALL}, 'value'),
-     State({'type': 'composition', 'index': ALL}, 'value')],
+     State({'type': 'composition', 'index': ALL}, 'value'),
+     State('simulation-method', 'value')],
     prevent_initial_call=True
 )
 def calculate_design(n_clicks, F, P_kPa, q, rec_lk, rec_hk, r_factor, eff_pct,
-                     n_components, compound_names, compositions):
+                     n_components, compound_names, compositions, sim_method):
     """Main calculation callback - DYNAMIC!"""
     try:
         # Validate inputs
@@ -177,38 +181,118 @@ def calculate_design(n_clicks, F, P_kPa, q, rec_lk, rec_hk, r_factor, eff_pct,
 
         thermo = ThermodynamicPackage(compounds)
 
-        # Run shortcut design
-        shortcut = ShortcutDistillation(thermo, F, z_F, P)
-        results = shortcut.complete_shortcut_design(
-            recovery_LK_D=recovery_LK_D,
-            recovery_HK_B=recovery_HK_B,
-            R_factor=r_factor,
-            q=q,
-            efficiency=efficiency
-        )
+        if sim_method == 'shortcut':
+            # Run shortcut design
+            shortcut = ShortcutDistillation(thermo, F, z_F, P)
+            results = shortcut.complete_shortcut_design(
+                recovery_LK_D=recovery_LK_D,
+                recovery_HK_B=recovery_HK_B,
+                R_factor=r_factor,
+                q=q,
+                efficiency=efficiency
+            )
 
-        # Calculate profiles
-        N_real = results['N_real']
-        stages = np.arange(1, N_real + 1).tolist()
-        x_profiles = np.zeros((N_real, n_components))
-        temperatures = np.zeros(N_real)
+            # Calculate approximate linear profiles for shortcut
+            N_real = results['N_real']
+            stages = np.arange(1, N_real + 1).tolist()
+            x_profiles = np.zeros((N_real, n_components))
+            y_profiles = np.zeros((N_real, n_components))
+            temperatures = np.zeros(N_real)
+            L_flows = np.zeros(N_real)
+            V_flows = np.zeros(N_real)
 
-        for j, stage in enumerate(stages):
-            if stage <= results['feed_stage']:
-                ratio = (stage - 1) / results['feed_stage'] if results['feed_stage'] > 0 else 0
-                x_stage = results['x_D'] + ratio * (z_F - results['x_D'])
-            else:
-                ratio = (stage - results['feed_stage']) / (N_real - results['feed_stage'])
-                x_stage = z_F + ratio * (results['x_B'] - z_F)
+            for j, stage in enumerate(stages):
+                if stage <= results['feed_stage']:
+                    ratio = (stage - 1) / results['feed_stage'] if results['feed_stage'] > 0 else 0
+                    x_stage = results['x_D'] + ratio * (z_F - results['x_D'])
+                else:
+                    ratio = (stage - results['feed_stage']) / (N_real - results['feed_stage'])
+                    x_stage = z_F + ratio * (results['x_B'] - z_F)
 
-            x_stage = x_stage / np.sum(x_stage)
-            x_profiles[j, :] = x_stage
+                x_stage = x_stage / np.sum(x_stage)
+                x_profiles[j, :] = x_stage
+                y_profiles[j, :] = x_stage  # Approximate for shortcut
 
-            try:
-                T_bubble, _ = thermo.bubble_temperature(P, x_stage)
-                temperatures[j] = T_bubble
-            except:
-                temperatures[j] = compounds[0].Tb + (compounds[-1].Tb - compounds[0].Tb) * (j / N_real)
+                try:
+                    T_bubble, _ = thermo.bubble_temperature(P, x_stage)
+                    temperatures[j] = T_bubble
+                except:
+                    temperatures[j] = compounds[0].Tb + (compounds[-1].Tb - compounds[0].Tb) * (j / N_real)
+
+            # Approximate flow rates (CMO assumption)
+            D_flow = results.get('D', F * 0.5)
+            R_actual = results['R_min'] * r_factor
+            for j in range(N_real):
+                if j < results['feed_stage']:
+                    L_flows[j] = R_actual * D_flow
+                    V_flows[j] = (R_actual + 1) * D_flow
+                else:
+                    L_flows[j] = L_flows[results['feed_stage']-1] + F
+                    V_flows[j] = V_flows[results['feed_stage']-1]
+
+            results['QC'] = 0.0  # Placeholder
+            results['QR'] = 0.0
+            results['y_profiles'] = y_profiles.tolist()
+            results['L_flows'] = L_flows.tolist()
+            results['V_flows'] = V_flows.tolist()
+            results['method'] = 'shortcut'
+
+        else:  # rigorous MESH
+            # Run shortcut first to get initial estimates
+            shortcut = ShortcutDistillation(thermo, F, z_F, P)
+            initial_results = shortcut.complete_shortcut_design(
+                recovery_LK_D=recovery_LK_D,
+                recovery_HK_B=recovery_HK_B,
+                R_factor=r_factor,
+                q=q,
+                efficiency=efficiency
+            )
+
+            # Run MESH solver with shortcut results as initial guess
+            N_theoretical = int(initial_results['N_theoretical'])
+            feed_stage_mesh = int(initial_results['feed_stage'])
+            R_actual = initial_results['R_min'] * r_factor
+
+            mesh_solver = MESHSolver(
+                thermo_package=thermo,
+                F=F,
+                z_F=z_F,
+                P=P,
+                N=N_theoretical,
+                feed_stage=feed_stage_mesh,
+                R=R_actual
+            )
+
+            mesh_results = mesh_solver.solve(max_iter=100, tol_T=0.1, tol_x=1e-6)
+
+            # Package results
+            stages = list(range(1, N_theoretical + 1))
+            x_profiles = mesh_results['x_profiles']
+            y_profiles = mesh_results['y_profiles']
+            temperatures = mesh_results['temperatures']
+            L_flows = mesh_results['L_flows']
+            V_flows = mesh_results['V_flows']
+
+            results = {
+                'N_min': initial_results['N_min'],
+                'R_min': initial_results['R_min'],
+                'N_theoretical': N_theoretical,
+                'N_real': int(N_theoretical / efficiency),
+                'feed_stage': feed_stage_mesh,
+                'R_operating': R_actual,
+                'D': mesh_results['D'],
+                'B': mesh_results['B'],
+                'x_D': mesh_results['x_D'].tolist(),
+                'x_B': mesh_results['x_B'].tolist(),
+                'QC': mesh_results['QC'],
+                'QR': mesh_results['QR'],
+                'converged': mesh_results['converged'],
+                'iterations': mesh_results['iterations'],
+                'y_profiles': y_profiles.tolist(),
+                'L_flows': L_flows.tolist(),
+                'V_flows': V_flows.tolist(),
+                'method': 'rigorous'
+            }
 
         store_data = {
             'results': {k: float(v) if isinstance(v, (np.integer, np.floating)) else
@@ -263,6 +347,27 @@ def create_results_page(store_data):
         comp_fig = create_composition_figure(stages, x_profiles, results['feed_stage'], compound_names)
         temp_fig = create_temperature_figure(stages, temperatures, results['feed_stage'])
         gill_fig = create_gilliland_figure(results)
+
+        # Additional plots for rigorous simulation
+        show_rigorous = results.get('method') == 'rigorous'
+        if show_rigorous or 'y_profiles' in results:
+            y_profiles = np.array(results.get('y_profiles', x_profiles))
+            L_flows = np.array(results.get('L_flows', []))
+            V_flows = np.array(results.get('V_flows', []))
+            QC = results.get('QC', 0.0)
+            QR = results.get('QR', 0.0)
+
+            vapor_fig = create_vapor_composition_figure(stages, y_profiles, results['feed_stage'], compound_names)
+            if len(L_flows) > 0 and len(V_flows) > 0:
+                flow_fig = create_flow_rates_figure(stages, L_flows, V_flows, results['feed_stage'])
+                duties_card = create_heat_duties_card(QC, QR)
+            else:
+                flow_fig = {}
+                duties_card = html.Div()
+        else:
+            vapor_fig = {}
+            flow_fig = {}
+            duties_card = html.Div()
 
     return dbc.Container([
         html.H4("DESIGN RESULTS",
@@ -400,7 +505,43 @@ def create_results_page(store_data):
                 ], style={'border': f'2px solid {COLORS["border"]}',
                          'backgroundColor': 'white'})
             ], md=6),
-        ]),
+        ], className="mb-4"),
+
+        # Rigorous simulation additional results
+        dbc.Row([
+            dbc.Col([
+                html.Div([
+                    html.H6("VAPOR COMPOSITION PROFILES",
+                           style={'fontWeight': '700', 'letterSpacing': '1px',
+                                 'padding': '1rem', 'margin': '0',
+                                 'backgroundColor': COLORS['card_bg'],
+                                 'borderBottom': f'2px solid {COLORS["border"]}'}),
+                    dcc.Graph(figure=vapor_fig, config={'displayModeBar': False},
+                             style={'backgroundColor': 'white'})
+                ], style={'border': f'2px solid {COLORS["border"]}',
+                         'backgroundColor': 'white'})
+            ], md=6),
+
+            dbc.Col([
+                html.Div([
+                    html.H6("INTERNAL FLOW RATES",
+                           style={'fontWeight': '700', 'letterSpacing': '1px',
+                                 'padding': '1rem', 'margin': '0',
+                                 'backgroundColor': COLORS['card_bg'],
+                                 'borderBottom': f'2px solid {COLORS["border"]}'}),
+                    dcc.Graph(figure=flow_fig, config={'displayModeBar': False},
+                             style={'backgroundColor': 'white'})
+                ], style={'border': f'2px solid {COLORS["border"]}',
+                         'backgroundColor': 'white'})
+            ], md=6),
+        ], className="mb-4") if vapor_fig else html.Div(),
+
+        # Heat duties card
+        dbc.Row([
+            dbc.Col([
+                duties_card
+            ], md=12)
+        ]) if duties_card and not isinstance(duties_card, type(html.Div())) else html.Div(),
 
     ], fluid=True, style={'padding': '3rem 2rem'})
 
