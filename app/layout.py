@@ -64,6 +64,15 @@ def navbar():
                                        'padding': '1rem 2rem',
                                        'borderRight': f'1px solid {COLORS["input_border"]}'
                                    })),
+            dbc.NavItem(dbc.NavLink("PARAMETRIC", href="/parametric", active="exact",
+                                   style={
+                                       'color': COLORS['text'],
+                                       'fontWeight': '700',
+                                       'fontSize': '0.9rem',
+                                       'letterSpacing': '1px',
+                                       'padding': '1rem 2rem',
+                                       'borderRight': f'1px solid {COLORS["input_border"]}'
+                                   })),
             dbc.NavItem(dbc.NavLink("REPORT", href="/report", active="exact",
                                    style={
                                        'color': COLORS['text'],
@@ -342,11 +351,80 @@ def design_page():
     ])
 
 
+def parametric_page():
+    """Parametric studies page"""
+    return html.Div([
+        dbc.Container([
+            html.H4("PARAMETRIC STUDIES",
+                   style={
+                       'fontWeight': '800',
+                       'letterSpacing': '1.5px',
+                       'color': COLORS['primary'],
+                       'marginBottom': '2rem',
+                       'fontSize': '1.5rem',
+                       'borderBottom': f'3px solid {COLORS["border"]}',
+                       'paddingBottom': '1rem'
+                   }),
+
+            dbc.Row([
+                dbc.Col([
+                    html.H6("STUDY TYPE",
+                           style={'fontWeight': '700', 'letterSpacing': '1px',
+                                 'marginBottom': '1.5rem', 'color': COLORS['primary']}),
+
+                    dcc.Dropdown(
+                        id='study-type',
+                        options=[
+                            {'label': 'Effect of Reflux Ratio', 'value': 'reflux'},
+                            {'label': 'Effect of Operating Pressure', 'value': 'pressure'},
+                            {'label': 'Reflux Optimization (TAC)', 'value': 'optimization'}
+                        ],
+                        value='reflux',
+                        clearable=False,
+                        style={'marginBottom': '1rem'}
+                    ),
+
+                    dbc.Button("RUN STUDY",
+                              id='run-study-btn',
+                              size='lg',
+                              style={
+                                  'width': '100%',
+                                  'backgroundColor': COLORS['primary'],
+                                  'border': 'none',
+                                  'borderRadius': '0',
+                                  'padding': '1rem',
+                                  'fontWeight': '800',
+                                  'letterSpacing': '2px',
+                                  'fontSize': '0.9rem',
+                                  'marginTop': '1rem'
+                              }),
+
+                    html.Div(id='study-status', style={'marginTop': '1rem'})
+
+                ], md=3, style={
+                    'backgroundColor': COLORS['card_bg'],
+                    'padding': '2rem',
+                    'border': f'1px solid {COLORS["input_border"]}'
+                }),
+
+                dbc.Col([
+                    html.Div(id='parametric-results',
+                            children=html.P("Select study type and run to see results",
+                                          style={'textAlign': 'center', 'padding': '3rem',
+                                                'color': COLORS['text_secondary']}))
+                ], md=9)
+            ])
+
+        ], fluid=True, style={'padding': '3rem 2rem'})
+    ])
+
+
 # Main layout
 app.layout = html.Div([
     dcc.Location(id='url', refresh=False),
     dcc.Store(id='calculation-store'),
     dcc.Store(id='compound-store'),  # Store selected compounds
+    dcc.Store(id='parametric-store'),  # Store parametric study data
     navbar(),
     html.Div(id='page-content', style={'minHeight': '80vh', 'backgroundColor': COLORS['background']})
 ], style={'backgroundColor': COLORS['background']})

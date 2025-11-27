@@ -12,5 +12,6 @@ from .models import Compound
 from .thermodynamics import ThermodynamicPackage
 from .shortcut import ShortcutDistillation
 from .mesh import MESHSolver
+from .parametric import ParametricStudy
 
-__all__ = ['Compound', 'ThermodynamicPackage', 'ShortcutDistillation', 'MESHSolver']
+__all__ = ['Compound', 'ThermodynamicPackage', 'ShortcutDistillation', 'MESHSolver', 'ParametricStudy']

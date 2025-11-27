@@ -5,8 +5,8 @@ Dash callbacks for application logic - DYNAMIC VERSION
 import numpy as np
 import dash_bootstrap_components as dbc
 from dash import Input, Output, State, callback, no_update, html, dcc, ALL, MATCH
-from distillation import Compound, ThermodynamicPackage, ShortcutDistillation, MESHSolver
-from .layout import design_page, COMMON_COMPOUNDS
+from distillation import Compound, ThermodynamicPackage, ShortcutDistillation, MESHSolver, ParametricStudy
+from .layout import design_page, parametric_page, COMMON_COMPOUNDS
 from .figures import (
     create_material_balance_figure,
     create_composition_figure,
@@ -29,6 +29,8 @@ def display_page(pathname, store_data):
     """Route pages based on URL"""
     if pathname == '/results':
         return create_results_page(store_data)
+    elif pathname == '/parametric':
+        return parametric_page()
     elif pathname == '/report':
         return create_report_page(store_data)
     else:
@@ -578,3 +580,298 @@ def create_report_page(store_data):
         }),
 
     ], fluid=True, style={'padding': '3rem 2rem', 'maxWidth': '1400px'})
+
+
+@callback(
+    [Output('study-status', 'children'),
+     Output('parametric-results', 'children')],
+    Input('run-study-btn', 'n_clicks'),
+    [State('study-type', 'value'),
+     State('calculation-store', 'data')],
+    prevent_initial_call=True
+)
+def run_parametric_study(n_clicks, study_type, calc_data):
+    """Run parametric study based on selected type"""
+    import plotly.graph_objects as go
+
+    try:
+        if not calc_data:
+            status = html.Div("ERROR: Run a design calculation first",
+                            style={'padding': '1rem', 'backgroundColor': '#ffebee',
+                                  'border': '2px solid #c62828', 'fontWeight': '600',
+                                  'color': '#c62828'})
+            return [status, no_update]
+
+        # Extract base case data
+        compound_names = calc_data['compound_names']
+        z_F = np.array(calc_data['z_F'])
+        F = calc_data['F']
+        results = calc_data['results']
+        P_base = results.get('P', 101325)
+
+        # Create compounds and thermo package
+        compounds = [Compound(name) for name in compound_names]
+        thermo = ThermodynamicPackage(compounds)
+
+        # Initialize parametric study
+        parametric = ParametricStudy(thermo, F, z_F, P_base)
+
+        if study_type == 'reflux':
+            # Reflux ratio study
+            study_results = parametric.reflux_study()
+
+            # Create plots
+            fig1 = go.Figure()
+            fig1.add_trace(go.Scatter(
+                x=study_results['R_values'],
+                y=study_results['N_theoretical'],
+                mode='lines+markers',
+                name='Theoretical Stages',
+                line=dict(color='#000000', width=2),
+                marker=dict(size=6)
+            ))
+            fig1.add_trace(go.Scatter(
+                x=study_results['R_values'],
+                y=study_results['N_real'],
+                mode='lines+markers',
+                name='Real Stages',
+                line=dict(color='#666666', width=2, dash='dash'),
+                marker=dict(size=6)
+            ))
+            fig1.add_vline(x=study_results['R_min'], line_dash="dash",
+                          line_color='#d32f2f', line_width=2,
+                          annotation_text=f"R_min = {study_results['R_min']:.2f}")
+            fig1.update_layout(
+                title='Number of Stages vs Reflux Ratio',
+                xaxis_title='Reflux Ratio (R)',
+                yaxis_title='Number of Stages',
+                plot_bgcolor='white',
+                height=400,
+                hovermode='closest',
+                showlegend=True
+            )
+
+            fig2 = go.Figure()
+            fig2.add_trace(go.Scatter(
+                x=study_results['R_values'],
+                y=[abs(q) for q in study_results['total_energy']],
+                mode='lines+markers',
+                line=dict(color='#d32f2f', width=2),
+                marker=dict(size=6),
+                fill='tozeroy',
+                fillcolor='rgba(211, 47, 47, 0.1)'
+            ))
+            fig2.update_layout(
+                title='Total Energy vs Reflux Ratio',
+                xaxis_title='Reflux Ratio (R)',
+                yaxis_title='Total Energy (kW)',
+                plot_bgcolor='white',
+                height=400,
+                hovermode='closest'
+            )
+
+            results_div = html.Div([
+                dbc.Row([
+                    dbc.Col([
+                        html.Div([
+                            html.H6("NUMBER OF STAGES VS REFLUX",
+                                   style={'fontWeight': '700', 'padding': '1rem',
+                                         'borderBottom': f'2px solid {COLORS["border"]}'}),
+                            dcc.Graph(figure=fig1, config={'displayModeBar': False})
+                        ], style={'border': f'2px solid {COLORS["border"]}', 'backgroundColor': 'white'})
+                    ], md=6),
+                    dbc.Col([
+                        html.Div([
+                            html.H6("ENERGY CONSUMPTION VS REFLUX",
+                                   style={'fontWeight': '700', 'padding': '1rem',
+                                         'borderBottom': f'2px solid {COLORS["border"]}'}),
+                            dcc.Graph(figure=fig2, config={'displayModeBar': False})
+                        ], style={'border': f'2px solid {COLORS["border"]}', 'backgroundColor': 'white'})
+                    ], md=6)
+                ]),
+                dbc.Row([
+                    dbc.Col([
+                        html.Div([
+                            html.H6("KEY FINDINGS", style={'fontWeight': '700', 'marginBottom': '1rem'}),
+                            html.P(f"Minimum Reflux: {study_results['R_min']:.3f}"),
+                            html.P(f"Recommended Range: {1.2*study_results['R_min']:.2f} - {1.5*study_results['R_min']:.2f}"),
+                            html.P("Higher reflux = fewer stages but more energy consumption")
+                        ], style={'backgroundColor': '#f5f5f5', 'padding': '1.5rem',
+                                'border': f'1px solid {COLORS["input_border"]}', 'marginTop': '1rem'})
+                    ], md=12)
+                ])
+            ])
+
+        elif study_type == 'pressure':
+            # Pressure study
+            study_results = parametric.pressure_study()
+
+            # Create plots
+            fig1 = go.Figure()
+            fig1.add_trace(go.Scatter(
+                x=study_results['P_values'],
+                y=study_results['alpha_avg'],
+                mode='lines+markers',
+                line=dict(color='#000000', width=2),
+                marker=dict(size=6)
+            ))
+            fig1.update_layout(
+                title='Average Relative Volatility vs Pressure',
+                xaxis_title='Pressure (atm)',
+                yaxis_title='Average Relative Volatility',
+                plot_bgcolor='white',
+                height=400
+            )
+
+            fig2 = go.Figure()
+            fig2.add_trace(go.Scatter(
+                x=study_results['P_values'],
+                y=study_results['N_theoretical'],
+                mode='lines+markers',
+                line=dict(color='#666666', width=2),
+                marker=dict(size=6)
+            ))
+            fig2.update_layout(
+                title='Number of Stages vs Pressure',
+                xaxis_title='Pressure (atm)',
+                yaxis_title='Theoretical Stages',
+                plot_bgcolor='white',
+                height=400
+            )
+
+            fig3 = go.Figure()
+            fig3.add_trace(go.Scatter(
+                x=study_results['P_values'],
+                y=study_results['T_top'],
+                mode='lines+markers',
+                name='Top Temperature',
+                line=dict(color='#1976d2', width=2),
+                marker=dict(size=6)
+            ))
+            fig3.add_trace(go.Scatter(
+                x=study_results['P_values'],
+                y=study_results['T_bottom'],
+                mode='lines+markers',
+                name='Bottom Temperature',
+                line=dict(color='#d32f2f', width=2),
+                marker=dict(size=6)
+            ))
+            fig3.update_layout(
+                title='Operating Temperatures vs Pressure',
+                xaxis_title='Pressure (atm)',
+                yaxis_title='Temperature (°C)',
+                plot_bgcolor='white',
+                height=400,
+                showlegend=True
+            )
+
+            results_div = html.Div([
+                dbc.Row([
+                    dbc.Col([
+                        html.Div([
+                            html.H6("VOLATILITY VS PRESSURE",
+                                   style={'fontWeight': '700', 'padding': '1rem',
+                                         'borderBottom': f'2px solid {COLORS["border"]}'}),
+                            dcc.Graph(figure=fig1, config={'displayModeBar': False})
+                        ], style={'border': f'2px solid {COLORS["border"]}', 'backgroundColor': 'white'})
+                    ], md=6),
+                    dbc.Col([
+                        html.Div([
+                            html.H6("STAGES VS PRESSURE",
+                                   style={'fontWeight': '700', 'padding': '1rem',
+                                         'borderBottom': f'2px solid {COLORS["border"]}'}),
+                            dcc.Graph(figure=fig2, config={'displayModeBar': False})
+                        ], style={'border': f'2px solid {COLORS["border"]}', 'backgroundColor': 'white'})
+                    ], md=6)
+                ]),
+                dbc.Row([
+                    dbc.Col([
+                        html.Div([
+                            html.H6("TEMPERATURES VS PRESSURE",
+                                   style={'fontWeight': '700', 'padding': '1rem',
+                                         'borderBottom': f'2px solid {COLORS["border"]}'}),
+                            dcc.Graph(figure=fig3, config={'displayModeBar': False})
+                        ], style={'border': f'2px solid {COLORS["border"]}', 'backgroundColor': 'white'})
+                    ], md=12)
+                ], className="mt-3")
+            ])
+
+        else:  # optimization
+            # TAC optimization
+            opt_results = parametric.optimize_reflux()
+
+            # Create plot
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(
+                x=opt_results['R_values'],
+                y=opt_results['TAC_values'],
+                mode='lines+markers',
+                name='Total Annualized Cost',
+                line=dict(color='#000000', width=2),
+                marker=dict(size=6)
+            ))
+            fig.add_trace(go.Scatter(
+                x=opt_results['R_values'],
+                y=opt_results['capital_costs'],
+                mode='lines',
+                name='Capital Cost',
+                line=dict(color='#1976d2', width=2, dash='dash')
+            ))
+            fig.add_trace(go.Scatter(
+                x=opt_results['R_values'],
+                y=opt_results['operating_costs'],
+                mode='lines',
+                name='Operating Cost',
+                line=dict(color='#d32f2f', width=2, dash='dash')
+            ))
+            fig.add_vline(x=opt_results['R_optimal'], line_dash="dot",
+                         line_color='#2e7d32', line_width=3,
+                         annotation_text=f"Optimal R = {opt_results['R_optimal']:.2f}")
+            fig.update_layout(
+                title='Total Annualized Cost Optimization',
+                xaxis_title='Reflux Ratio (R)',
+                yaxis_title='Cost ($/year)',
+                plot_bgcolor='white',
+                height=500,
+                showlegend=True,
+                hovermode='closest'
+            )
+
+            results_div = html.Div([
+                dbc.Row([
+                    dbc.Col([
+                        html.Div([
+                            html.H6("COST OPTIMIZATION",
+                                   style={'fontWeight': '700', 'padding': '1rem',
+                                         'borderBottom': f'2px solid {COLORS["border"]}'}),
+                            dcc.Graph(figure=fig, config={'displayModeBar': False})
+                        ], style={'border': f'2px solid {COLORS["border"]}', 'backgroundColor': 'white'})
+                    ], md=12)
+                ]),
+                dbc.Row([
+                    dbc.Col([
+                        html.Div([
+                            html.H6("OPTIMAL DESIGN", style={'fontWeight': '700', 'marginBottom': '1rem'}),
+                            html.H4(f"R = {opt_results['R_optimal']:.2f}", style={'color': '#2e7d32', 'fontWeight': '800'}),
+                            html.P(f"Number of Stages: {opt_results['N_optimal']}"),
+                            html.P(f"TAC: ${opt_results['TAC_optimal']:,.0f}/year"),
+                            html.P(f"Reflux Factor: {opt_results['R_factor_optimal']:.2f} x R_min")
+                        ], style={'backgroundColor': '#e8f5e9', 'padding': '1.5rem',
+                                'border': f'2px solid #2e7d32', 'marginTop': '1rem', 'textAlign': 'center'})
+                    ], md=12)
+                ])
+            ])
+
+        status = html.Div("STUDY COMPLETE",
+                         style={'padding': '1rem', 'backgroundColor': '#e8f5e9',
+                               'border': '2px solid #2e7d32', 'fontWeight': '600',
+                               'color': '#2e7d32', 'textAlign': 'center'})
+
+        return [status, results_div]
+
+    except Exception as e:
+        status = html.Div(f"ERROR: {str(e)}",
+                         style={'padding': '1rem', 'backgroundColor': '#ffebee',
+                               'border': '2px solid #c62828', 'fontWeight': '600',
+                               'color': '#c62828'})
+        return [status, no_update]
