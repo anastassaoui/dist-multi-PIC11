@@ -1,50 +1,13 @@
-# =============================================================================
-# REQUIREMENTS.TXT - Distillation Multicomposants DASH APP
-# =============================================================================
-# Cours: Modélisation et Simulation des Procédés - PIC
-# Prof. BAKHER Zine Elabidine - Uh1
-# =============================================================================
-
-# ===========================
-# CORE SCIENTIFIC LIBRARIES
-# ===========================
 numpy
 scipy
 pandas
-
-# ======================================
-# THERMODYNAMIC LIBRARIES
-# ======================================
 thermo
 chemicals
 CoolProp
-
-# ======================================
-# DASH WEB APPLICATION FRAMEWORK
-# ======================================
 dash
 dash-bootstrap-components
-
-# ======================================
-# VISUALIZATION (PLOTLY)
-# ======================================
 plotly
 kaleido
-
-# ======================================
-# UTILITIES
-# ======================================
 openpyxl
+gunicorn
 
-# ======================================
-# NOTES D'INSTALLATION
-# ======================================
-# Pour installer toutes les dépendances:
-# pip install -r requirements.txt
-
-# Pour lancer l'application Dash:
-# python app.py
-# Puis ouvrir: http://127.0.0.1:8050
-
-# Si problème avec kaleido:
-# pip install kaleido --no-cache-dir --upgrade
