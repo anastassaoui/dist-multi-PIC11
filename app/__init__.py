@@ -15,6 +15,9 @@ app = dash.Dash(
 
 app.title = "Distillation Column Designer"
 
+# Expose server for gunicorn
+server = app.server
+
 # Color scheme
 COLORS = {
     'background': '#f5f5f5',
@@ -31,4 +34,4 @@ COLORS = {
 
 from . import layout, callbacks
 
-__all__ = ['app', 'COLORS']
+__all__ = ['app', 'server', 'COLORS']
